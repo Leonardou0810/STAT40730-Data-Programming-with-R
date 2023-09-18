@@ -1,0 +1,119 @@
+---
+title: "Assignment02"
+author: "Junhao Ou & 21200066"
+date: "2022-10-26"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### 1. Load in the data. Convert each column to an ordered factor with appropriate labels. Display the structure of the dataset.
+
+First of all, we will load the data.
+
+```{r}
+df = read.table('s50_1995.txt',sep = " ",header = T )
+```
+
+Next, we will convert each column to an ordered factor.
+
+```{r}
+df$alcohol = factor(df$alcohol, levels = c(1,2,3,4,5), labels = c('Alcohol Abstinence', 'Mild Drinking', 'No-risk Drinking', 'Risk Drinking', 'High Risk Drinking'), ordered = TRUE)
+df$drugs  = factor(df$drugs, levels = c(1,2,3,4), labels = c('never', 'tried once', 'occasional', 'regular'), ordered = TRUE)
+df$smoke = factor(df$smoke, levels = c(1,2,3), labels = c('never', 'occasional', 'regular'), ordered = TRUE)
+df$sport = factor(df$sport, levels = c(1,2), labels = c('not regular', 'regular'), ordered = TRUE)
+df
+```
+
+Then, we will check the structure of the dataframe.
+
+```{r}
+str(df)
+```
+
+As we can see above, the dataframe has 50 observations of 4 variables.
+
+### 2. Using base R, create two suitable graphs, with labels, colours etc., one illustrating the variable smoke and the other illustrating the variable sport. Put the two plots next to each other on the same page. Comment on the resulting plots.
+
+```{r}
+par(mfrow=c(1,2))
+barplot(table(df$smoke), main = "Barplot of smoke", col = "lightblue", las = 1, cex.names = 0.7, ylim = c(0,50))
+barplot(table(df$sport), main = "Barplot of sport", col = "lightblue", las = 1, cex.names = 0.7, ylim = c(0,50))
+```
+
+From the bar plots above, we can see that among the 50 investigated pupils, more than 35 had never smoked, while 5 pupils took smoking occasionally and 7 pupils took smoking regularly. When it comes to sport, around 13 pupils were reported not having regular sport, whereas 37 pupils were of regular sport.
+
+### 3. Produce some code to answer the following questions:
+• What is the proportion of pupils who smoke at least occasionally?
+
+```{r}
+proportion1 = length(which(df$smoke!='never'))/length(df$smoke)
+print(paste("The proportion of pupils who smoke at least occasionally is (%)", proportion1*100))
+```
+
+• What is the proportion of pupils who regularly practiced sport and smoke at least occasionally?
+```{r}
+proportion2 = length(which((df$smoke!='never') & (df$sport =='regular')))/length(df$smoke)
+print(paste("The proportion of pupils who regularly practiced sport and smoke at least occasionally is (%)", proportion2*100))
+```
+
+4. We would like to be able to summarise such data sets as new data arrive. For this reason, we want to turn the object containing the data into an S3 class called s50survey and write a summary method that will show the proportion of students for every level of each variable. Test your function on the s50_1995.txt data.
+
+```{r}
+#Create the class 's50survey'
+class(df) <- "s50survey"
+
+#Define a function to calculate the proportion of students for any level of label of each variable.
+summary.s50survey = function(df) {
+    for (i in 1:length(df)){
+      print(table(df[i])/sum(table(df[i])))
+    }
+}
+
+#Test the function on the s50_1995.txt data.
+summary(df)
+```
+
+5. What is the proportion of pupils who did not use cannabis?
+```{r}
+proportion3 = length(which(df$drugs == 'never'))/length(df$drugs)
+print(paste("The proportion of pupils who did not use cannabi is", proportion3*100, "%."))
+```
+
+6. Follow up data on the same students has been collected also in 1997. Read in the file s50_1997.txt, convert each column to an ordered factor, and assign the class s50survey to this dataset as well. Test the summary S3 method on this new dataset.
+
+First, we will load the data 's50_1997.txt' and convert column to an ordered factor.
+
+```{r}
+df_1997 = read.table('s50_1997.txt',sep = " ",header = T )
+df_1997$alcohol = factor(df_1997$alcohol, levels = c(1,2,3,4,5), labels = c('Alcohol Abstinence', 'Mild Drinking', 'No-risk Drinking', 'Risk Drinking', 'High Risk Drinking'), ordered = TRUE)
+df_1997$drugs  = factor(df_1997$drugs, levels = c(1,2,3,4), labels = c('never', 'tried once', 'occasional', 'regular'), ordered = TRUE)
+df_1997$smoke = factor(df_1997$smoke, levels = c(1,2,3), labels = c('never', 'occasional', 'regular'), ordered = TRUE)
+df_1997$sport = factor(df_1997$sport, levels = c(1,2), labels = c('not regular', 'regular'), ordered = TRUE)
+df_1997
+```
+
+Then, we will assign the class s50survey to this dataset and test the summary S3 method on this new dataset.
+
+```{r}
+class(df_1997) <- "s50survey"
+summary(df_1997)
+```
+
+7. Did the proportion of students practising sport regularly increased or decreased with respect to the 1995 data?
+
+```{r}
+proportion4 = length(which(df$sport == 'regular'))/length(df$sport)
+print(paste("The proportion of pupils practising sport regularly in 1995 is (%)", proportion4*100))
+```
+
+```{r}
+proportion5 = length(which(df_1997$sport == 'regular'))/length(df_1997$sport)
+print(paste("The proportion of pupils practising sport regularly in 1997 is (%)", proportion5*100))
+```
+
+From the result above, we can conclude that the proportion of pupils practising sport regularly experienced a decrease from 74% in 1995 to 38% in 1997.
