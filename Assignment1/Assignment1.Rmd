@@ -1,0 +1,128 @@
+---
+title: "Assignment1"
+author: "Junhao Ou & 21200066"
+date: "2022-09-26"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+# Task 1: Manipulation
+
+## 1. Load the dataset EurostatCrime2019.csv
+
+In this section, we will load the dataset
+
+```{r}
+df = read.csv('EurostatCrime2019.csv',row.names = 1)
+```
+
+## 2. Structure Check
+
+In this section, we will check the size (number of rows and columns) and the structure of this data.
+
+```{r}
+str(df)
+```
+
+As we can see, the size of the table is 41 rows by 13 columns.
+
+## 3. Produce appropriate commands to do the following actions.
+
+### (i) Remove the columns of Rape and Sexual.assault.
+
+```{r}
+df = df[,-which(names(df) %in% c('Rape','Sexual.assault'))]
+str(df)
+```
+
+### (ii) Remove the columns involving theft and burglary
+```{r}
+library(dplyr)
+df = select(df, -contains("Theft"))
+df = select(df, -contains("Burglary"))
+str(df)
+```
+
+### (iii) Add a column containing the overall record of offences for each country (per hundred thousand inhabitants)
+```{r}
+df['Overall Record'] = rowSums(df[,c(1:7)])
+```
+
+## 4. List the countries that contain any missing data.
+```{r}
+row.names(df[rowSums(is.na(df)) > 0,])
+```
+
+## 5. Remove the countries with missing data from the dataframe.
+```{r}
+df = subset(df,rowSums(is.na(df)) <= 0)
+```
+
+## 6. How many observations and variables are in this new dataframe?
+```{r}
+str(df)
+```
+
+# Task 2: Analysis
+
+## 1. According to these data what were the 3 most common crimes in Ireland in 2019?
+
+Then, we will implement a function that can return the 3 most common crimes with input country.
+
+```{r}
+maxthree = function(data, row) {
+    x <- data[row,1:7] 
+    return(x[order(x, decreasing = T)][1:3])
+}
+```
+
+Check the 3 most common crimes in Ireland in 2019
+
+```{r}
+maxthree(df, "Ireland")
+```
+
+## 2. What proportion of the overall crimes was due to Assault in Ireland in 2019?
+
+We will implement a function that can return the proportion of any type of crime of any country.
+```{r}
+propCal = function(data,country,crime) {
+  prop = data[country,crime]/data[country,'Overall Record']
+  return(prop)
+}
+```
+
+Check the proportion of the overall crimes was due to Assault in Ireland.
+```{r}
+propCal(df, "Ireland",'Assault')
+```
+
+## 3. Which country had the highest record of kidnapping in 2019.
+```{r}
+rownames(df)[order(df[,'Kidnapping'], decreasing = T)][1]
+```
+
+## 4. Which country had the lowest overall record of offences in 2019 (per hundred thousand inhabitants)?
+```{r}
+rownames(df)[order(df[,'Overall Record'], decreasing = F)][1]
+```
+
+## 5. Create a plot displaying the relationship between robbery and unlawful acts involving controlled drugs or precursors. Make the plot look “nice” i.e. change axis labels etc.
+
+```{r}
+plot(df$Robbery,df$Unlawful.acts.involving.controlled.drugs.or.precursors,xlab='Robbery',ylab='Unlawful acts',main='The relationship between robbery and unlawful acts')
+```
+
+# Task 3: Creativity
+1. We will plot the histogram of Overall Record for each country
+```{r}
+library(reshape2)
+library(ggplot2)
+df1 <- melt(df$'Overall Record',id.vars="Row.names")
+ggplot(df1, aes(x = rownames(df), y=value))+geom_bar(stat="identity", position ="dodge")+theme_bw()+theme(axis.text.x = element_text(angle=-40, hjust=.1))+labs(x = "Country",y='Number of overall records')
+```
+
+
+From the plot above, we can conclude that the top 5 countries with the greatest number of crime records are Luxembourg, Swizerland, Finland, Germany and Ireland.
