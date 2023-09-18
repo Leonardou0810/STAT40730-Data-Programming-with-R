@@ -1,0 +1,321 @@
+---
+title: "R Project"
+author: "Junhao Ou & 21200066"
+date: "2022-11-16"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+
+## Part 1: Analysis
+In this part of the project, I analyzed residential real estate data of USA to explore the historical house prices by state, city, residential property area and some other attributions. The data was collected on 27/Jun/2021 by ZenRows and the original data set is available at: https://www.zenrows.com/datasets/us-real-estate.
+
+### 1. Loading data
+```{r}
+#Load dataset
+df_raw = read.csv("us-cities-real-estate-sample-zenrows.csv")
+#Check the structure of the data set.
+str(df_raw)
+```
+The dataset contains a wide range of features. In the following step, I will select the features of interest in this project for the analysis.
+
+### 2. Feature selection
+```{r}
+#Select the features potentially helpful for analysis.
+#Here I used `select` function from package `dplyr` to select the columns I wanted.
+citation("dplyr")
+library(dplyr)
+df_extracted = select(df_raw, c('id', 'statusText', 'addressStreet', 'addressCity', 'addressState', 'area', 'hasAdditionalAttributions', 'isFeaturedListing','latitude','longitude', 'unformattedPrice'))
+head(df_extracted,20)
+```
+From the 'df_raw', I selected the following features: 'id', 'statusText', 'addressStreet', 'addressCity', 'addressState', 'area', 'hasAdditionalAttributions', 'isFeaturedListing','latitude','longitude', 'unformattedPrice' as the features for the future analysis.
+
+### 3. Data cleaning
+```{r}
+# Remove duplicate rows
+df_extracted = df_extracted[!duplicated(df_extracted), ]
+```
+
+```{r}
+# Remove rows having missing values and rows having string 'NULL' as value.
+df_extracted = subset(df_extracted,rowSums(is.na(df_extracted)) <= 0)
+
+# identify which rows in the dataset contain 'NULL'.
+rows_to_remove = which(df_extracted[,-1] == 'NULL', arr.ind=T)[,1]
+# subset these rows
+df_extracted = df_extracted[-rows_to_remove,]
+#Check the structure.
+str(df_extracted)
+```
+After removing any possible duplicated instances and instances having 'NULL' values, we have 6840 objects left in the dataset 'df_extracted'.
+
+In the following step, I will convert the data into proper type for the analysis.
+```{r}
+#Convert data into proper type
+df_extracted$unformattedPrice <- as.numeric(df_extracted$unformattedPrice)
+df_extracted$area <- as.numeric(df_extracted$area)
+df_extracted$latitude <- as.numeric(df_extracted$latitude)
+df_extracted$longitude <- as.numeric(df_extracted$longitude)
+df_extracted$hasAdditionalAttributions <- as.logical(df_extracted$hasAdditionalAttributions)
+```
+
+The 'unformattedPrice' in the house data set contains lots of outliers (Fig 3-1a). I removed the outliers and only included the prices that are within 95 % of median price value. The box plot after removing outliers is shown in the Fig 3-1b.
+```{r}
+#Remove the outliers
+quartiles <- quantile(df_extracted$unformattedPrice, probs=c(.25, .75), na.rm = FALSE)
+IQR <- IQR(df_extracted$unformattedPrice)
+ 
+Lower <- quartiles[1] - 1.5*IQR
+Upper <- quartiles[2] + 1.5*IQR 
+ 
+df_cleaned <- subset(df_extracted, df_extracted$unformattedPrice > Lower & df_extracted$unformattedPrice < Upper)
+
+par(mfrow=c(1,2))
+boxplot(df_extracted$unformattedPrice,ylab = "unformattedPrice", main = 'Fig 3-1a: Original data set')
+boxplot(df_cleaned$unformattedPrice,ylab = "unformattedPrice" ,main = 'Fig 3-1b: Remove outliers')
+```
+```{r}
+#Check the structure of df_cleaned
+str(df_cleaned)
+```
+After removing outliers, we have 6400 objects in the data set 'df_cleaned'.
+
+### 4. Analysis
+
+First of all, we will check the statistic summary of continuous features.
+```{r}
+# load the library
+library(psych)
+describe(df_cleaned[ , c('area','unformattedPrice')])
+```
+From the summary table above, we can see that the average area of real estate of USA is 1957.27, and the average transaction price is 302501.78.
+
+
+In the following cells, we will try to count the number of real estate transactions in the USA and visualise the results based on different categorcial features.
+
+#### Number of records vs State
+```{r}
+library(ggplot2)
+#Count number of records of each addressState and put the data in dataframe.
+value_counts <- rle(sort(df_cleaned$addressState))
+df_value_counts <- data.frame(index=value_counts$values, number=value_counts$lengths)
+
+#Plot the number of records of real estate transaction for each state.
+ggplot(df_value_counts, aes(x = reorder(index, +number), y= number))+geom_bar(stat="identity", position ="dodge")+theme_bw()+theme(axis.text.x = element_text(angle=-60, hjust=.1))+labs(x = "State",y='Number of records')+geom_text(aes(label = number), nudge_y = 6, size=2.2)+ggtitle('Fig 4-1: Number of records of different states of USA')
+```
+
+From Fig 4-1, we can see that the top 5 states with the most real estate transaction records are Florida, Texas, California, Washington and Virginia.
+
+#### Number of records vs City
+```{r}
+#Count number of records of each addressCity and put the data in dataframe.
+value_counts <- rle(sort(df_cleaned$addressCity))
+df_city_value_counts <- data.frame(index=value_counts$values, number=value_counts$lengths)
+df_city_value_counts <- df_city_value_counts[with(df_city_value_counts,order(-number)),]
+# Since there are too many different cities in the data set, we will only choose the top 20 highest values to visualise.
+df_city_value_counts_top20 <- df_city_value_counts[1:20,]
+
+ggplot(df_city_value_counts_top20, aes(x = reorder(index, +number), y= number))+geom_bar(stat="identity", position ="dodge")+theme_bw()+theme(axis.text.x = element_text(angle=-60, hjust=.1))+labs(x = "State",y='Number of records')+geom_text(aes(label = number), nudge_y = 6, size=2.2)+ggtitle('Fig 4-2: Top 20 number of records of different cities of USA')
+```
+
+From Fig 4-2, we can see that the top 5 cities with the most real estate transaction records are Philadephia, Las Vegas, Atlanta, Seattle and Portland.
+
+#### Number of records vs Status text
+```{r}
+#Count number of records of each statusText and put the data in dataframe.
+value_counts <- rle(sort(df_cleaned$statusText))
+df_value_counts <- data.frame(index=value_counts$values, number=value_counts$lengths)
+
+#Plot the number of records of real estate transaction for each statusText
+ggplot(df_value_counts, aes(x = reorder(index, +number), y= number))+geom_bar(stat="identity", position ="dodge")+theme_bw()+theme(axis.text.x = element_text(angle=-60, hjust=.1))+labs(x = "State",y='Number of records')+geom_text(aes(label = number), nudge_y = 80, size=3)+ggtitle('Fig 4-3: Number of records based on status text')
+```
+
+As we can see above, more than half of the records we have in the data set are classified as either 'House for sale' or 'Condo for sale'. We also have another approximately 1400 of records classified as 'Townhouse for sale', 'Multi-family home for sale' and 'Home for sale' respectively.
+
+#### addressState vs unformattedPrice
+```{r}
+#Plot the boxplot of addressState vs unformattedPrice
+ggplot(df_cleaned, aes(reorder(addressState,unformattedPrice,median), unformattedPrice)) + geom_hline(yintercept=median(df_cleaned$unformattedPrice), colour = "red") + scale_y_continuous(limits = c(0, 900000)) +theme_bw()+theme(axis.text.x = element_text(angle=-60, hjust=.1)) +labs(x = "State",y='Unformatted price') + geom_boxplot()+ggtitle('Fig 4-4: Boxplot of unformatted price based on state')
+```
+
+The median sold price in Idaho(ID) is the highest in USA, which is about a factor of 1.5 higher than the national median value of around 260000 (shown in red line). The median sold price in Colorado(CO) is the second highest in the country, which is followed by Massachusetts(MA) ranked 3rd.
+
+There are several states exhibit a very wide distribution among other states, including Hawaii(HI), California(CA), Delaware(DE) and NY(New York). This probably indicates that the historical real estate sold prices fluctuate more in the above-stated states.
+
+Interestingly, the house price in the New York city is thought to be very expensive, but the median sold price of the entire NY state is just slightly above the national median price. And for the other states with relatively high GDP such as Texas, Florida and Pennsylvania, the median sold prices of the real estate are all below the national median price.
+
+#### hasAdditionalAttributions vs unformattedPrice
+```{r}
+ggplot(df_cleaned, aes(hasAdditionalAttributions, unformattedPrice)) + geom_hline(yintercept = median(df_cleaned$unformattedPrice), colour = "red") + scale_y_continuous(limits = c(0, 900000)) +theme_bw()+theme(axis.text.x = element_text(angle=-60, hjust=.1)) +labs(x = "Additional Attributions",y='Unformatted price') + geom_boxplot()+ggtitle('Fig 4-5: Boxplot of unformatted price vs Additional Attributions')
+```
+
+```{r}
+ggplot(df_cleaned, aes(isFeaturedListing, unformattedPrice)) + geom_hline(yintercept = median(df_cleaned$unformattedPrice), colour = "red") + scale_y_continuous(limits = c(0, 900000)) +theme_bw()+theme(axis.text.x = element_text(angle=-60, hjust=.1)) +labs(x = "Featured Listing",y='Unformatted price') + geom_boxplot()+ggtitle('Fig 4-5: Boxplot of unformatted price vs Featured Listing')
+```
+
+From Fig 4-4 and Fig 4-5, we can conclude that: Residential property with additional attributions has slightly higher median sold price than the property without additional attributions; Residential property that is not featured listing  has slightly higher median sold price than the property that is featured listing.
+
+#### Area vs Unformatted price
+```{r}
+#Before we plot the relationship between area and unformatted price, we need to implement the discretization transform on the values in 'area'.
+df_cleaned <- within(df_cleaned, {   
+    area.cat <- NA # need to initialize variable
+    area.cat[area < 1000] <- "area < 1000"
+    area.cat[area >= 1000 & area < 2000] <- "1000 <= area < 2000"
+    area.cat[area >= 2000 & area < 3000] <- "2000 <= area < 3000"
+    area.cat[area >= 3000 & area < 4000] <- "3000 <= area < 4000"
+    area.cat[area >= 4000 & area < 5000] <- "4000 <= area < 5000"
+    area.cat[area >= 5000 & area < 6000] <- "5000 <= area < 6000"
+    area.cat[area >= 6000 & area < 7000] <- "6000 <= area < 7000"
+    area.cat[area >= 7000 & area < 8000] <- "7000 <= area < 8000"
+    area.cat[area >= 8000 & area < 9000] <- "8000 <= area < 9000"
+    area.cat[area >= 9000 & area < 10000] <- "9000 <= area < 10000"
+    area.cat[area >= 10000] <- "area >= 10000"
+} )
+```
+
+```{r}
+ggplot(df_cleaned, aes(reorder(area.cat,unformattedPrice), unformattedPrice)) + geom_hline(yintercept = median(df_cleaned$unformattedPrice), colour = "red") + scale_y_continuous(limits = c(0, 900000)) +theme_bw()+theme(axis.text.x = element_text(angle=-60, hjust=.1)) +labs(x = "Area",y='Unformatted price') + geom_boxplot()+ggtitle('Fig 4-6: Boxplot of unformatted price vs Area')
+```
+
+The median sold price of the residential properties with the area between 6000 to 7000 is the highest in USA, which is about a factor of 2.5 higher than the national median price. And the properties with the area less than 1000 has the lowest median sold price.
+
+It is interesting to see that as long as the area of the residential property goes beyond 2000, the median sold price of discrete bins are always greater than the national median price.
+
+### Conclusion
+Based on the analysis above, we can generally conclude that the location (state/city) have a strong relation to the price of sold residential properties. Additionally, some other features such as the additional attributions, featured listing and the area of properties could also impact the price.
+
+## Part 2: R Package
+
+### 1. Package Introduction
+The package I chose to demonstrate in this part is ggmap. The package ggmap is bascially an extension of ggplot2 and allows us to download open sourced map objects, e.g., Google Maps or Open Street Maps. The basic idea driving ggmap is to take a downloaded map image, plot it as a contextual layer using ggplot2, and then plot additional content layers of data, statistics, or models on top of the map.
+
+In ggmap, the process can be divided into two steps:
+  1. Download the maps and formatting them for plotting. We can use the function `get_map()`
+  2. Make the plot with `ggmap`, and any additional attributes.
+
+### 2. ggplot in practice
+In the following cells, I will demonstrate the usage of ggmap by plotting the sold price we have in the data set 'df_cleaned' in part 1.
+
+```{r} 
+citation('ggmap')
+library(ggmap) 
+#Enable google map service. 
+#Google Map API key is exclusively for this project, please keep the confidentiality.
+#For any Google's Terms of Service: https://cloud.google.com/maps-platform/terms/
+register_google(key = "AIzaSyCm-5ioMkkdryWNUolXpU0hyGp8bfWyAsU") 
+``` 
+
+
+The function `register_google` enables us to access the goole map service through the google map API key. `get_map` enables us to obtain the USA map from google map API service. `geom_point` function enables us to plot the geographical data on the map. We set the paramater `size = unformattedPrice` so that the size of the dot will be customized based on the price. `scale_size` enables us to control the scale of the size of points on the map.
+
+```{r} 
+#Create a map and plot the data of real estate prices on the map.
+map <- get_map(location = "usa", zoom = 4) 
+ggmap(map) + geom_point(data = df_cleaned, aes(x = longitude, y = latitude, size = unformattedPrice, alpha=0.25, color="red")) + scale_size(range = c(0.5,2.5))
+```
+
+From the map above, we can see that the east coast, west coast and the middle east of the USA have relatively more frequent real estate transactions. Meanwhile, sold prices on the East and west coasts are generally higher than those in the central region.
+
+### Interaction of ggmap with other packages.
+In order to further explore the usage of ggmap, I tried to collaborate it with the function `filter` in package `dplyr` to demonstrate more integrated information.
+
+In this part of the project, I introduced another data set "sdcrime_20.csv" which contains the information on all reported crimes in San Diego in 2020. The original data set is availabe at: https://data.sandiegodata.org/dataset/sandiegodata-org-crime-victims/. Please note that the data set "sdcrime_20.csv" has been pre-cleaned by author before loading here.
+
+```{r}
+#Load the data set.
+sdcrime_20_df = read.csv("sdcrime_20.csv")
+#Convert the data into proper data type.
+sdcrime_20_df$intptlat <- as.numeric(sdcrime_20_df$intptlat)
+sdcrime_20_df$intptlon <- as.numeric(sdcrime_20_df$intptlon)
+
+#Load the map
+san.diego.map <- get_map(location = "San Diego", zoom = 11)
+
+library(dplyr)
+#Filter the data set based on different type of crimes. Here I have filtered out all the type of crimes in 'chargedescription' and converted them into string values.
+sdcrime_20_df_sub <- sdcrime_20_df %>%
+  filter(chargedescription %in% c("TAKE VEHICLE W/O OWNER'S CONSENT/VEHICLE THEFT (F)", 'PETTY THEFT(from Veh) (M)', 'BATTERY:SPOUSE/EX SPOUSE/DATE/ETC (M)', 'SPOUSAL/COHABITANT ABUSE WITH MINOR INJURY (F)', 'BATTERY ON PERSON (M)', 'BURGLARY (VEHICLE) (F)')) 
+
+#Plot the data on the map based on the different type of crimes
+#Code resourced from: http://lab.rady.ucsd.edu/sawtooth/RAnalytics/maps.html
+ggmap(san.diego.map) + 
+  geom_point(data=sdcrime_20_df_sub,aes(x=intptlon,y=intptlat,color=chargedescription),size=.15,alpha=.3) + 
+  facet_wrap(~chargedescription) + 
+  theme(legend.position="none")
+```
+
+Here we can see that the data for each type of crime have been shown in the maps. Most of the crimes were recorded happening in the north east and south west of San Diego. Meanwhile, the crime type 'TAKE VEHICLE W/O OWNER'S CONSENT/VEHICLE THEFT' was reported to be the most happened in 2020 in San Diego.
+
+### Conclusion
+In this part of the report, the author managed to elaborate the usage of ggmap and how can it collaborate with other packages. It is exciting to see the possibility of using ggmap for data analytics. For example, more investigation can be done to analyse the impact of crime on local housing prices in San Diego by plotting crime data and housing price data on the map if we can obtain more historicial housing transaction prices in San Diego.
+
+## Part 3: Functions/Programming
+In this section of the project, I created functions providing statistic information of the state that user input. There are three functions including `print`, `summary` and `plot`, where `print` gives us the top 10 residential property transactions based on the sold price, `summary` gives us the statistic description of the house price and house area of selected state and `plot` shows us the historic sold prices on the map.
+
+```{r}
+#Create the function to subset the data set based on the input from user.
+new_state_info = function(stateName){
+  df_subset = subset(df_cleaned, df_cleaned$addressState == stateName, class="state_info")
+  return(df_subset)
+}
+
+#Turn a variable into a class s_data
+s_data = new_state_info
+
+#Providing an appropriate printing function
+print.state_info = function(s_data){
+  df_show = s_data[order(s_data$unformattedPrice, decreasing = TRUE), ]
+  df_show = df_show[1:10,]
+  return(df_show)
+  #return(describe(s_data[ , c('area','unformattedPrice')]))
+}
+
+#Input the state and pass the s_data through our printing function
+print.state_info(s_data("TX"))
+```
+
+The print function with 'TX' as the parameter show us the top 10 highest residential property transaction records in Texas.
+
+```{r}
+#Providing an appropriate summary function
+summary.state_info = function(s_data){
+  return(describe(s_data[ , c('area','unformattedPrice')]))
+}
+
+#Input the state and pass the s_data through our summary function
+summary.state_info(s_data("TX"))
+```
+
+The summary function with 'TX' as the parameter give us the statistic description summary of the area and price data of the residential properties sold in Texas. The average sold area of properties is 1889.81 and the average sold price is 262744.17.
+
+```{r}
+#Providing an appropriate plot function
+plot.state_info = function(stateName, s_data){
+  
+  map <- get_map(location = stateName, zoom = 6) 
+  
+  ggmap(map) + geom_point(data = s_data, aes(x = longitude, y = latitude, size = unformattedPrice, alpha=0.25, color="red")) + scale_size(range = c(2,5))
+}
+
+#Input the state and pass the s_data through our plot function
+plot.state_info("TX",s_data("TX"))
+```
+
+From the plot function above, we can see that the transaction records mostly cluster at the central state and coast areas of Texas.
+
+## Summary
+This is a meaningful project for learning to harness R as a programming language. During the project, I was able to put the theoretic knowledge I learned from R lectures into practice and extend my abilities on R programming as well as on data analysis.
+
+Struggles
+
+Finding a proper data set for this project is not a easy job actually. In order to deliever a quality of work where I can not only demonstrate my understanding of different packages and functions in R, but also keep all the parts of project connected to each other to finally provide a project with strong consistancy, I chose the US historical real estate as my main research data set.
+
+Further Exploration
+
+In part 2, I have plotted the sold prices of residential properties on the US map. It would be interesting to explore some other features that could impact the housing prices and plot them on the map at the same time. For example, the GDP of each state/city, the crime rate or location of transportation hubs, etc.
